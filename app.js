@@ -1,71 +1,122 @@
 import 'dotenv/config';
-import express from 'express';
-import {
-  ButtonStyleTypes,
-  InteractionResponseFlags,
-  InteractionResponseType,
-  InteractionType,
-  MessageComponentTypes,
-  verifyKeyMiddleware,
-} from 'discord-interactions';
-import { getRandomEmoji, DiscordRequest } from './utils.js';
-import { getShuffledOptions, getResult } from './game.js';
+import { Client, GatewayIntentBits } from 'discord.js';
+import { testConnection } from './src/database/supabase.js';
+import { handleButtonInteraction } from './src/handlers/buttonHandler.js';
+import { startEventScheduler } from './src/handlers/eventScheduler.js';
+import { handleCreateEventCommand } from './src/commands/createEvent.js';
+import { handleCloseEventCommand } from './src/commands/closeEvent.js';
+import { handleExportEventCommand } from './src/commands/exportEvent.js';
 
-// Create an express app
-const app = express();
-// Get port, or default to 3000
-const PORT = process.env.PORT || 3000;
-// To keep track of our active games
-const activeGames = {};
+// Create Discord client with required intents
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,          // Required for guild/server operations
+    GatewayIntentBits.GuildMessages,   // Required for message operations
+    GatewayIntentBits.GuildMembers,    // Required for member data
+  ],
+});
 
-/**
- * Interactions endpoint URL where Discord will send HTTP requests
- * Parse request body and verifies incoming requests using discord-interactions package
- */
-app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async function (req, res) {
-  // Interaction id, type and data
-  const { id, type, data } = req.body;
-
-  /**
-   * Handle verification requests
-   */
-  if (type === InteractionType.PING) {
-    return res.send({ type: InteractionResponseType.PONG });
+// Bot ready event
+client.once('ready', async () => {
+  console.log('🤖 Bot is ready!');
+  console.log(`📝 Logged in as ${client.user.tag}`);
+  console.log(`🔗 Connected to ${client.guilds.cache.size} server(s)`);
+  
+  // Test database connection
+  console.log('\n🗄️  Testing database connection...');
+  const dbConnected = await testConnection();
+  
+  if (!dbConnected) {
+    console.error('⚠️  WARNING: Database connection failed. Check your SUPABASE_URL and SUPABASE_KEY in .env');
   }
+  
+  // Start event scheduler
+  console.log('\n⏰ Starting event scheduler...');
+  startEventScheduler(client);
+  
+  console.log('\n✅ Bot initialization complete!');
+  console.log('📋 Waiting for interactions...\n');
+});
 
-  /**
-   * Handle slash command requests
-   * See https://discord.com/developers/docs/interactions/application-commands#slash-commands
-   */
-  if (type === InteractionType.APPLICATION_COMMAND) {
-    const { name } = data;
-
-    // "test" command
-    if (name === 'test') {
-      // Send a message into the channel where command was triggered from
-      return res.send({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          flags: InteractionResponseFlags.IS_COMPONENTS_V2,
-          components: [
-            {
-              type: MessageComponentTypes.TEXT_DISPLAY,
-              // Fetches a random emoji to send from a helper function
-              content: `hello world ${getRandomEmoji()}`
-            }
-          ]
-        },
-      });
+// Handle interaction create (slash commands and buttons)
+client.on('interactionCreate', async (interaction) => {
+  try {
+    // Handle slash commands
+    if (interaction.isChatInputCommand()) {
+      const { commandName } = interaction;
+      
+      console.log(`📢 Received command: /${commandName} from ${interaction.user.tag}`);
+      
+      // Route to command handlers
+      switch (commandName) {
+        case 'create-event':
+          await handleCreateEventCommand(interaction);
+          break;
+          
+        case 'close-event':
+          await handleCloseEventCommand(interaction);
+          break;
+          
+        case 'export-event':
+          await handleExportEventCommand(interaction);
+          break;
+          
+        default:
+          await interaction.reply({
+            content: `❌ Unknown command: ${commandName}`,
+            ephemeral: true,
+          });
+      }
     }
-
-    console.error(`unknown command: ${name}`);
-    return res.status(400).json({ error: 'unknown command' });
+    
+    // Handle button interactions
+    else if (interaction.isButton()) {
+      await handleButtonInteraction(interaction);
+    }
+  } catch (error) {
+    console.error('❌ Error handling interaction:', error);
+    
+    // Try to respond with error message
+    try {
+      const errorMessage = {
+        content: '❌ An error occurred while processing your request. Please try again.',
+        ephemeral: true,
+      };
+      
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(errorMessage);
+      } else {
+        await interaction.reply(errorMessage);
+      }
+    } catch (followUpError) {
+      console.error('❌ Failed to send error message:', followUpError);
+    }
   }
-
-  console.error('unknown interaction type', type);
-  return res.status(400).json({ error: 'unknown interaction type' });
 });
 
-app.listen(PORT, () => {
-  console.log('Listening on port', PORT);
+// Handle errors
+client.on('error', (error) => {
+  console.error('❌ Discord client error:', error);
 });
+
+// Handle warnings
+client.on('warn', (warning) => {
+  console.warn('⚠️  Discord client warning:', warning);
+});
+
+// Login to Discord
+const token = process.env.DISCORD_TOKEN;
+
+if (!token) {
+  console.error('❌ ERROR: DISCORD_TOKEN is not set in .env file');
+  process.exit(1);
+}
+
+console.log('🚀 Starting Discord bot...\n');
+client.login(token).catch((error) => {
+  console.error('❌ Failed to login to Discord:', error);
+  process.exit(1);
+});
+
+// Export client for use in other modules
+export default client;
