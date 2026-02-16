@@ -5,8 +5,9 @@ const optionSchema = new mongoose.Schema({
   value: { type: String, required: true },
   description: { type: String, default: '' },
   emoji: {
-    id: { type: String, default: null },
-    name: { type: String, default: '' },
+    id: { type: String, default: null },       // Custom emoji ID
+    name: { type: String, default: null },     // Custom emoji name
+    unicode: { type: String, default: null },  // Unicode emoji character
   },
   action: {
     type: { type: String, enum: ['addRole'], default: 'addRole' },

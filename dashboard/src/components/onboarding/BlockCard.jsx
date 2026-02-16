@@ -1,4 +1,5 @@
 import RoleSelect from '../RoleSelect.jsx';
+import EmojiPicker from './EmojiPicker.jsx';
 
 function MessageBlockEditor({ block, onChange }) {
   return (
@@ -34,49 +35,12 @@ function DelayBlockEditor({ block, onChange }) {
   );
 }
 
-function emojiUrl(emoji) {
-  const ext = emoji.animated ? 'gif' : 'png';
-  return `https://cdn.discordapp.com/emojis/${emoji.id}.${ext}?size=20`;
-}
-
-function EmojiSelect({ emojis, value, onChange }) {
-  const currentId = value?.id || '';
-
-  function handleChange(e) {
-    const id = e.target.value;
-    if (!id) {
-      onChange(null);
-    } else {
-      const em = emojis.find((e) => e.id === id);
-      if (em) onChange({ id: em.id, name: em.name });
-    }
-  }
-
-  const selected = currentId ? emojis.find((e) => e.id === currentId) : null;
-
-  return (
-    <div className="ob-emoji-select">
-      {selected && (
-        <img src={emojiUrl(selected)} alt={selected.name} className="ob-emoji-preview" />
-      )}
-      <select className="form-select" value={currentId} onChange={handleChange} style={{ width: 130 }}>
-        <option value="">No emoji</option>
-        {emojis.map((em) => (
-          <option key={em.id} value={em.id}>
-            :{em.name}:
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 function OptionEditor({ option, index, roles, emojis, showEmoji, onUpdate, onRemove }) {
   return (
     <div className="ob-option-row">
       {showEmoji && (
-        <EmojiSelect
-          emojis={emojis}
+        <EmojiPicker
+          customEmojis={emojis}
           value={option.emoji}
           onChange={(emoji) => onUpdate({ ...option, emoji })}
         />

@@ -9,7 +9,11 @@ function replaceVars(text, userId, username, guildName) {
 
 function buildEmoji(emoji) {
   if (!emoji) return undefined;
+  // Custom emoji (has ID)
   if (emoji.id) return { id: emoji.id, name: emoji.name };
+  // Unicode emoji (no ID, just the unicode character)
+  if (emoji.unicode) return { name: emoji.unicode };
+  // Fallback for legacy format
   if (emoji.name) return { name: emoji.name };
   return undefined;
 }
