@@ -196,18 +196,26 @@ export async function handleInteraction(req, res) {
       });
     }
 
-    // Ticket: join thread button
+    // Ticket: join thread button — claim ticket and remove button
     if (customId?.startsWith('ticket:join:')) {
       const threadId = customId.split(':')[2];
       const userId = req.body.member?.user?.id || req.body.user?.id;
 
       try {
         await addThreadMember(threadId, userId);
+
+        // Update the notification message: show who claimed it and remove the button
+        const originalEmbed = req.body.message?.embeds?.[0] || {};
         return res.send({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          type: InteractionResponseType.UPDATE_MESSAGE,
           data: {
-            content: '\u2705 Tu as rejoint le thread !',
-            flags: 64,
+            embeds: [{
+              ...originalEmbed,
+              color: 0x57F287,
+              footer: { text: `✅ Pris en charge par ${req.body.member?.nick || req.body.member?.user?.global_name || req.body.member?.user?.username || 'un modérateur'}` },
+              timestamp: new Date().toISOString(),
+            }],
+            components: [],
           },
         });
       } catch (err) {
