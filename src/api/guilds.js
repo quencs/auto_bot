@@ -3,6 +3,7 @@ import { requireGuildAdmin } from './middleware.js';
 import GuildConfig from '../models/GuildConfig.js';
 import Embed from '../models/Embed.js';
 import OnboardingConfig from '../models/OnboardingConfig.js';
+import TicketConfig from '../models/TicketConfig.js';
 import { DiscordRequest } from '../bot/utils.js';
 import { executeOnboarding } from '../bot/onboarding.js';
 
@@ -501,6 +502,100 @@ router.post('/:id/onboarding/test', requireGuildAdmin, async (req, res) => {
   } catch (err) {
     console.error('Error testing onboarding:', err);
     res.status(500).json({ error: 'Failed to test onboarding' });
+  }
+});
+
+// ── Tickets ──
+
+function validateTicketTypes(ticketTypes) {
+  const errors = [];
+  if (!Array.isArray(ticketTypes)) return ['ticketTypes must be an array'];
+  if (ticketTypes.length > 25) errors.push('Maximum 25 ticket types allowed');
+
+  for (let i = 0; i < ticketTypes.length; i++) {
+    const tt = ticketTypes[i];
+    if (!tt.id || !tt.label) {
+      errors.push(`Ticket type ${i}: missing id or label`);
+      continue;
+    }
+    if (tt.label.length > 100) errors.push(`Ticket type ${i}: label exceeds 100 chars`);
+    if (tt.description && tt.description.length > 100) errors.push(`Ticket type ${i}: description exceeds 100 chars`);
+    if (!tt.action || !tt.action.type) {
+      errors.push(`Ticket type ${i}: missing action`);
+    } else if (!['webhook', 'private-thread'].includes(tt.action.type)) {
+      errors.push(`Ticket type ${i}: invalid action type "${tt.action.type}"`);
+    } else if (tt.action.type === 'webhook' && !tt.action.webhookUrl) {
+      errors.push(`Ticket type ${i}: webhook action requires webhookUrl`);
+    } else if (tt.action.type === 'private-thread' && !tt.action.threadChannelId) {
+      errors.push(`Ticket type ${i}: private-thread action requires threadChannelId`);
+    }
+    if (tt.fields) {
+      if (tt.fields.length > 5) errors.push(`Ticket type ${i}: max 5 fields`);
+      for (let j = 0; j < tt.fields.length; j++) {
+        const f = tt.fields[j];
+        if (!f.id || !f.label) errors.push(`Ticket type ${i}, field ${j}: missing id or label`);
+        if (f.label && f.label.length > 45) errors.push(`Ticket type ${i}, field ${j}: label exceeds 45 chars`);
+      }
+    }
+  }
+  return errors;
+}
+
+/**
+ * GET /api/guilds/:id/tickets - Get ticket config
+ */
+router.get('/:id/tickets', requireGuildAdmin, async (req, res) => {
+  try {
+    let config = await TicketConfig.findOne({ guildId: req.params.id });
+    if (!config) {
+      config = await TicketConfig.create({ guildId: req.params.id });
+    }
+    res.json(config);
+  } catch (err) {
+    console.error('Error fetching ticket config:', err);
+    res.status(500).json({ error: 'Failed to fetch ticket config' });
+  }
+});
+
+/**
+ * PATCH /api/guilds/:id/tickets - Update ticket config
+ */
+router.patch('/:id/tickets', requireGuildAdmin, async (req, res) => {
+  try {
+    const { enabled, channelId, ticketTypes } = req.body;
+
+    if (ticketTypes !== undefined) {
+      const errors = validateTicketTypes(ticketTypes);
+      if (errors.length) return res.status(400).json({ error: errors.join(', ') });
+    }
+
+    const update = { updatedBy: req.session.userId };
+    if (enabled !== undefined) update.enabled = enabled;
+    if (channelId !== undefined) update.channelId = channelId;
+    if (ticketTypes !== undefined) update.ticketTypes = ticketTypes;
+
+    const config = await TicketConfig.findOneAndUpdate(
+      { guildId: req.params.id },
+      update,
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    // Sync flags to GuildConfig for quick gateway check
+    await GuildConfig.findOneAndUpdate(
+      { guildId: req.params.id },
+      {
+        $set: {
+          'tickets.enabled': config.enabled,
+          'tickets.channelId': config.channelId,
+        },
+      },
+      { upsert: true }
+    );
+
+    res.json(config);
+  } catch (err) {
+    console.error('Error updating ticket config:', err);
+    res.status(500).json({ error: 'Failed to update ticket config' });
   }
 });
 

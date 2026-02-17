@@ -1718,6 +1718,22 @@ a.ep-author-name:hover {
   flex-shrink: 0;
 }
 
+/* Ticket field rows */
+.tk-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.tk-field-row .form-input {
+  min-width: 0;
+}
+
+.tk-field-row .form-select {
+  flex-shrink: 0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .sidebar {

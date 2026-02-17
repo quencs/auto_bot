@@ -50,6 +50,10 @@ export const api = {
   updateOnboarding: (id, data) => request(`/guilds/${id}/onboarding`, { method: 'PATCH', body: JSON.stringify(data) }),
   testOnboarding: (id) => request(`/guilds/${id}/onboarding/test`, { method: 'POST' }),
 
+  // Tickets
+  getTickets: (id) => request(`/guilds/${id}/tickets`),
+  updateTickets: (id, data) => request(`/guilds/${id}/tickets`, { method: 'PATCH', body: JSON.stringify(data) }),
+
   // Embeds
   getEmbeds: (id) => request(`/guilds/${id}/embeds`),
   createEmbed: (id, data) => request(`/guilds/${id}/embeds`, { method: 'POST', body: JSON.stringify(data) }),

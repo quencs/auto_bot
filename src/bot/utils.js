@@ -78,14 +78,14 @@ export async function removeMemberRole(guildId, userId, roleId) {
 }
 
 /**
- * Send a payload to the n8n webhook for ticket processing
- * @param {object} payload - Ticket data to send
+ * Call a generic webhook URL with a JSON payload
+ * @param {string} url - Webhook URL to POST to
+ * @param {object} payload - JSON payload to send
  * @returns {object|null} Response data or null on error
  */
-export async function sendN8nWebhook(payload) {
-  const url = process.env.N8N_WEBHOOK_URL;
+export async function callWebhook(url, payload) {
   if (!url) {
-    console.error('N8N_WEBHOOK_URL not configured');
+    console.error('callWebhook: no URL provided');
     return null;
   }
   try {
@@ -95,12 +95,12 @@ export async function sendN8nWebhook(payload) {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      console.error(`n8n webhook error (${res.status})`);
+      console.error(`Webhook error (${res.status}): ${url}`);
       return null;
     }
     return res.json().catch(() => ({ success: true }));
   } catch (err) {
-    console.error('n8n webhook failed:', err.message);
+    console.error('Webhook call failed:', err.message);
     return null;
   }
 }

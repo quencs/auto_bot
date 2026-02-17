@@ -6,47 +6,10 @@ import {
   ButtonStyleTypes,
   TextStyleTypes,
 } from 'discord-interactions';
-import { addMemberRole, removeMemberRole, DiscordRequest, sendN8nWebhook, createPrivateThread, addThreadMember } from './utils.js';
+import { addMemberRole, removeMemberRole, DiscordRequest, callWebhook, createPrivateThread, addThreadMember } from './utils.js';
 import OnboardingConfig from '../models/OnboardingConfig.js';
 import GuildConfig from '../models/GuildConfig.js';
-
-const TICKET_CATEGORIES = {
-  'app-issue': {
-    label: 'Problème Application',
-    emoji: '\uD83D\uDC1B',
-    description: 'Signaler un bug dans l\'application',
-    labels: ['bug', 'app'],
-    fields: ['title', 'description', 'steps'],
-  },
-  'app-suggestion': {
-    label: 'Suggestion Application',
-    emoji: '\uD83D\uDCA1',
-    description: 'Proposer une amélioration pour l\'application',
-    labels: ['enhancement', 'app'],
-    fields: ['title', 'description'],
-  },
-  'discord-issue': {
-    label: 'Problème Discord',
-    emoji: '\u26A0\uFE0F',
-    description: 'Signaler un bug sur le serveur Discord',
-    labels: ['bug', 'discord'],
-    fields: ['title', 'description', 'steps'],
-  },
-  'discord-suggestion': {
-    label: 'Suggestion Discord',
-    emoji: '\u2B50',
-    description: 'Proposer une amélioration pour le serveur Discord',
-    labels: ['enhancement', 'discord'],
-    fields: ['title', 'description'],
-  },
-  'contact-mods': {
-    label: 'Contacter les Modos',
-    emoji: '\u2709\uFE0F',
-    description: 'Envoyer un message privé aux modérateurs',
-    labels: [],
-    fields: ['subject', 'message'],
-  },
-};
+import TicketConfig from '../models/TicketConfig.js';
 
 /**
  * Handle Discord interactions
@@ -79,7 +42,21 @@ export async function handleInteraction(req, res) {
     }
 
     if (name === 'ticket') {
+      const guildId = req.body.guild_id;
       const channelId = req.body.channel?.id || req.body.channel_id;
+
+      // Fetch config from DB
+      const ticketConfig = await TicketConfig.findOne({ guildId });
+      if (!ticketConfig?.enabled || !ticketConfig.ticketTypes?.length) {
+        return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content: '\u274C Le système de tickets n\'est pas configuré. Configurez-le depuis le dashboard.',
+            flags: 64,
+          },
+        });
+      }
+
       // Post the ticket panel embed + button via REST
       await DiscordRequest(`channels/${channelId}/messages`, {
         method: 'POST',
@@ -126,18 +103,36 @@ export async function handleInteraction(req, res) {
     const customId = req.body.data?.custom_id;
     const values = req.body.data?.values; // for dropdown
 
-    // Ticket: open button -> show category select menu
+    // Ticket: open button -> show ticket type select menu
     if (customId === 'ticket:open') {
-      const options = Object.entries(TICKET_CATEGORIES).map(([value, cat]) => ({
-        label: cat.label,
-        value,
-        description: cat.description,
-        emoji: { name: cat.emoji },
-      }));
+      const guildId = req.body.guild_id;
+      const ticketConfig = await TicketConfig.findOne({ guildId });
+      if (!ticketConfig?.ticketTypes?.length) {
+        return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { content: 'Aucun type de ticket configuré.', flags: 64 },
+        });
+      }
+
+      const options = ticketConfig.ticketTypes.map((tt) => {
+        const opt = {
+          label: tt.label,
+          value: tt.id,
+          description: tt.description || undefined,
+        };
+        // Handle emoji: custom vs unicode
+        if (tt.emoji?.id) {
+          opt.emoji = { id: tt.emoji.id, name: tt.emoji.name };
+        } else if (tt.emoji?.unicode) {
+          opt.emoji = { name: tt.emoji.unicode };
+        }
+        return opt;
+      });
+
       return res.send({
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
-          content: 'Choisis une catégorie pour ton ticket :',
+          content: 'Choisis un type de ticket :',
           flags: 64,
           components: [
             {
@@ -146,7 +141,7 @@ export async function handleInteraction(req, res) {
                 {
                   type: MessageComponentTypes.STRING_SELECT,
                   custom_id: 'ticket:select',
-                  placeholder: 'Choisis une catégorie...',
+                  placeholder: 'Choisis un type de ticket...',
                   options,
                 },
               ],
@@ -156,98 +151,72 @@ export async function handleInteraction(req, res) {
       });
     }
 
-    // Ticket: category selected -> open modal
+    // Ticket: type selected -> open modal
     if (customId === 'ticket:select' && values?.length) {
-      const category = values[0];
-      const cat = TICKET_CATEGORIES[category];
-      if (!cat) {
+      const ticketTypeId = values[0];
+      const guildId = req.body.guild_id;
+      const ticketConfig = await TicketConfig.findOne({ guildId });
+      const tt = ticketConfig?.ticketTypes?.find((t) => t.id === ticketTypeId);
+      if (!tt) {
         return res.send({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: 'Catégorie inconnue.', flags: 64 },
+          data: { content: 'Type de ticket inconnu.', flags: 64 },
         });
       }
 
-      const modalComponents = [];
+      // Build modal fields dynamically from ticket type config
+      const modalComponents = (tt.fields || []).map((field) => ({
+        type: MessageComponentTypes.ACTION_ROW,
+        components: [{
+          type: MessageComponentTypes.INPUT_TEXT,
+          custom_id: field.id,
+          label: field.label,
+          style: field.style === 'paragraph' ? TextStyleTypes.PARAGRAPH : TextStyleTypes.SHORT,
+          required: field.required !== false,
+          max_length: field.maxLength || 2000,
+          placeholder: field.placeholder || '',
+        }],
+      }));
 
-      if (cat.fields.includes('title')) {
-        modalComponents.push({
-          type: MessageComponentTypes.ACTION_ROW,
-          components: [{
-            type: MessageComponentTypes.INPUT_TEXT,
-            custom_id: 'title',
-            label: 'Titre',
-            style: TextStyleTypes.SHORT,
-            required: true,
-            max_length: 100,
-            placeholder: 'Résumé court du ticket',
-          }],
-        });
+      // Build modal title with emoji
+      let modalTitle = tt.label;
+      if (tt.emoji?.unicode) {
+        modalTitle = `${tt.emoji.unicode} ${tt.label}`;
       }
-      if (cat.fields.includes('subject')) {
-        modalComponents.push({
-          type: MessageComponentTypes.ACTION_ROW,
-          components: [{
-            type: MessageComponentTypes.INPUT_TEXT,
-            custom_id: 'subject',
-            label: 'Sujet',
-            style: TextStyleTypes.SHORT,
-            required: true,
-            max_length: 100,
-            placeholder: 'Sujet de ton message',
-          }],
-        });
-      }
-      if (cat.fields.includes('description')) {
-        modalComponents.push({
-          type: MessageComponentTypes.ACTION_ROW,
-          components: [{
-            type: MessageComponentTypes.INPUT_TEXT,
-            custom_id: 'description',
-            label: 'Description',
-            style: TextStyleTypes.PARAGRAPH,
-            required: true,
-            max_length: 2000,
-            placeholder: 'Décris en détail...',
-          }],
-        });
-      }
-      if (cat.fields.includes('message')) {
-        modalComponents.push({
-          type: MessageComponentTypes.ACTION_ROW,
-          components: [{
-            type: MessageComponentTypes.INPUT_TEXT,
-            custom_id: 'message',
-            label: 'Message',
-            style: TextStyleTypes.PARAGRAPH,
-            required: true,
-            max_length: 2000,
-            placeholder: 'Ton message pour les modérateurs...',
-          }],
-        });
-      }
-      if (cat.fields.includes('steps')) {
-        modalComponents.push({
-          type: MessageComponentTypes.ACTION_ROW,
-          components: [{
-            type: MessageComponentTypes.INPUT_TEXT,
-            custom_id: 'steps',
-            label: 'Étapes de reproduction',
-            style: TextStyleTypes.PARAGRAPH,
-            required: false,
-            max_length: 2000,
-            placeholder: '1. Aller sur...\n2. Cliquer sur...\n3. Observer que...',
-          }],
-        });
-      }
+      // Truncate to Discord's 45-char modal title limit
+      if (modalTitle.length > 45) modalTitle = modalTitle.slice(0, 45);
 
       return res.send({
         type: InteractionResponseType.MODAL,
         data: {
-          custom_id: `ticket:submit:${category}`,
-          title: `${cat.emoji} ${cat.label}`,
+          custom_id: `ticket:submit:${ticketTypeId}`,
+          title: modalTitle,
           components: modalComponents,
         },
       });
+    }
+
+    // Ticket: join thread button
+    if (customId?.startsWith('ticket:join:')) {
+      const threadId = customId.split(':')[2];
+      const userId = req.body.member?.user?.id || req.body.user?.id;
+
+      try {
+        await addThreadMember(threadId, userId);
+        return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content: '\u2705 Tu as rejoint le thread !',
+            flags: 64,
+          },
+        });
+      } catch (err) {
+        console.error('Join thread error:', err);
+        return res.send({
+          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: { content: 'Impossible de rejoindre le thread.', flags: 64 },
+        });
+      }
     }
 
     if (customId?.startsWith('onb:')) {
@@ -297,7 +266,7 @@ export async function handleInteraction(req, res) {
               }
             }
           }
-          
+
           let content = 'Done!';
           const rolesList = Array.from(roleMentions);
           if (rolesList.length === 1) {
@@ -329,12 +298,14 @@ export async function handleInteraction(req, res) {
     const customId = req.body.data?.custom_id;
 
     if (customId?.startsWith('ticket:submit:')) {
-      const category = customId.split(':')[2];
-      const cat = TICKET_CATEGORIES[category];
-      if (!cat) {
+      const ticketTypeId = customId.split(':')[2];
+      const guildId = req.body.guild_id;
+      const ticketConfig = await TicketConfig.findOne({ guildId });
+      const tt = ticketConfig?.ticketTypes?.find((t) => t.id === ticketTypeId);
+      if (!tt) {
         return res.send({
           type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: { content: 'Catégorie inconnue.', flags: 64 },
+          data: { content: 'Type de ticket inconnu.', flags: 64 },
         });
       }
 
@@ -342,21 +313,85 @@ export async function handleInteraction(req, res) {
       const fields = {};
       for (const row of req.body.data.components || []) {
         for (const comp of row.components || []) {
-          fields[comp.custom_id] = comp.value;
+          fields[tt.fields.find((f) => f.id === comp.custom_id)?.name] = comp.value;
         }
       }
 
       const user = req.body.member?.user || req.body.user;
-      const guildId = req.body.guild_id;
-      const channelId = req.body.channel?.id || req.body.channel_id;
 
       try {
-        if (category === 'contact-mods') {
-          // Create private thread for mod contact
-          const threadName = `Ticket - ${user.username} - ${(fields.subject || 'Sans sujet').slice(0, 50)}`;
-          const thread = await createPrivateThread(channelId, threadName);
+        if (tt.action.type === 'webhook') {
+          // Generic webhook action
+          const payload = {
+            ticketType: tt.id,
+            label: tt.label,
+            fields,
+            user: {
+              id: user.id,
+              username: user.username,
+              displayName: user.global_name || user.username,
+            },
+            guildId,
+            timestamp: new Date().toISOString(),
+          };
+
+          // Fire-and-forget
+          callWebhook(tt.action.webhookUrl, payload).catch(() => {});
+
+          // Post summary in log channel
+          const config = await GuildConfig.findOne({ guildId });
+          if (config?.logs?.enabled && config?.logs?.channelId) {
+            let emojiStr = '\uD83C\uDFAB';
+            if (tt.emoji?.unicode) emojiStr = tt.emoji.unicode;
+
+            const logFields = [
+              { name: 'Type', value: `${emojiStr} ${tt.label}`, inline: true },
+              { name: 'Auteur', value: `<@${user.id}>`, inline: true },
+            ];
+            for (const field of tt.fields || []) {
+              if (fields[field.id]) {
+                logFields.push({ name: field.label, value: fields[field.id].slice(0, 1024), inline: false });
+              }
+            }
+
+            await DiscordRequest(`channels/${config.logs.channelId}/messages`, {
+              method: 'POST',
+              body: {
+                embeds: [{
+                  title: '\uD83C\uDFAB Nouveau ticket',
+                  fields: logFields,
+                  color: 0x57F287,
+                  timestamp: new Date().toISOString(),
+                }],
+              },
+            });
+          }
+
+          return res.send({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: '\u2705 Ton ticket a été soumis !',
+              flags: 64,
+            },
+          });
+        }
+
+        if (tt.action.type === 'private-thread') {
+          // Build thread name from first field value
+          const threadChannelId = tt.action.threadChannelId;
+          const firstFieldValue = Object.values(fields)[0] || 'Sans sujet';
+          const threadName = `Ticket - ${user.username} - ${firstFieldValue.slice(0, 50)}`;
+          const thread = await createPrivateThread(threadChannelId, threadName);
 
           await addThreadMember(thread.id, user.id);
+
+          // Build embed fields dynamically
+          const embedFields = [];
+          for (const field of tt.fields || []) {
+            if (fields[field.id]) {
+              embedFields.push({ name: field.label, value: fields[field.id].slice(0, 1024), inline: false });
+            }
+          }
 
           // Post the member's message in the thread
           await DiscordRequest(`channels/${thread.id}/messages`, {
@@ -369,26 +404,44 @@ export async function handleInteraction(req, res) {
                     ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
                     : undefined,
                 },
-                title: fields.subject || 'Sans sujet',
-                description: fields.message || '',
+                title: Object.values(fields)[0] || 'Sans sujet',
+                description: embedFields.length > 1
+                  ? embedFields.slice(1).map((f) => `**${f.name}:**\n${f.value}`).join('\n\n')
+                  : '',
                 color: 0x5865F2,
                 timestamp: new Date().toISOString(),
               }],
             },
           });
 
-          // Notify in log channel
-          const config = await GuildConfig.findOne({ guildId });
-          if (config?.logs?.enabled && config?.logs?.channelId) {
-            await DiscordRequest(`channels/${config.logs.channelId}/messages`, {
+          // Notify in mod channel with join button
+          if (tt.action.notifyChannelId) {
+            let emojiStr = '\u2709\uFE0F';
+            if (tt.emoji?.unicode) emojiStr = tt.emoji.unicode;
+
+            await DiscordRequest(`channels/${tt.action.notifyChannelId}/messages`, {
               method: 'POST',
               body: {
                 embeds: [{
-                  title: '\u2709\uFE0F Nouveau ticket - Contact Modos',
-                  description: `**De:** <@${user.id}>\n**Sujet:** ${fields.subject || 'Sans sujet'}`,
+                  title: `${emojiStr} Nouveau ticket - ${tt.label}`,
+                  description: `**De:** <@${user.id}>\n**Sujet:** ${Object.values(fields)[0] || 'Sans sujet'}`,
                   color: 0xFEE75C,
                   timestamp: new Date().toISOString(),
                 }],
+                components: [
+                  {
+                    type: MessageComponentTypes.ACTION_ROW,
+                    components: [
+                      {
+                        type: MessageComponentTypes.BUTTON,
+                        style: ButtonStyleTypes.PRIMARY,
+                        label: 'Rejoindre le thread',
+                        custom_id: `ticket:join:${thread.id}`,
+                        emoji: { name: '\uD83D\uDD17' },
+                      },
+                    ],
+                  },
+                ],
               },
             });
           }
@@ -401,61 +454,6 @@ export async function handleInteraction(req, res) {
             },
           });
         }
-
-        // GitHub categories — send to n8n webhook
-        const payload = {
-          category,
-          title: fields.title || 'Sans titre',
-          description: fields.description || '',
-          steps: fields.steps || null,
-          labels: cat.labels,
-          user: {
-            id: user.id,
-            username: user.username,
-            displayName: user.global_name || user.username,
-          },
-          guildId,
-          timestamp: new Date().toISOString(),
-        };
-
-        // Fire-and-forget
-        sendN8nWebhook(payload).catch(() => {});
-
-        // Post summary in log channel
-        const config = await GuildConfig.findOne({ guildId });
-        if (config?.logs?.enabled && config?.logs?.channelId) {
-          const logFields = [
-            { name: 'Catégorie', value: `${cat.emoji} ${cat.label}`, inline: true },
-            { name: 'Auteur', value: `<@${user.id}>`, inline: true },
-            { name: 'Titre', value: fields.title || 'Sans titre', inline: false },
-          ];
-          if (fields.description) {
-            logFields.push({ name: 'Description', value: fields.description.slice(0, 1024), inline: false });
-          }
-          if (fields.steps) {
-            logFields.push({ name: 'Étapes de reproduction', value: fields.steps.slice(0, 1024), inline: false });
-          }
-
-          await DiscordRequest(`channels/${config.logs.channelId}/messages`, {
-            method: 'POST',
-            body: {
-              embeds: [{
-                title: '\uD83C\uDFAB Nouveau ticket',
-                fields: logFields,
-                color: 0x57F287,
-                timestamp: new Date().toISOString(),
-              }],
-            },
-          });
-        }
-
-        return res.send({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content: '\u2705 Ton ticket a été soumis ! Une issue GitHub sera créée.',
-            flags: 64,
-          },
-        });
       } catch (err) {
         console.error('Ticket submission error:', err);
         return res.send({

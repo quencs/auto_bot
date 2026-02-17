@@ -21,6 +21,12 @@ const guildConfigSchema = new mongoose.Schema({
     channelId: { type: String, default: null },
   },
 
+  // Tickets (quick check flags, full config in TicketConfig)
+  tickets: {
+    enabled: { type: Boolean, default: false },
+    channelId: { type: String, default: null },
+  },
+
   // Moderation logs
   logs: {
     enabled: { type: Boolean, default: false },
