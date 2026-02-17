@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { ClipboardCheck } from 'lucide-react';
 import { api } from '../api/client.js';
 import ModuleCard from '../components/ModuleCard.jsx';
 import ChannelSelect from '../components/ChannelSelect.jsx';
@@ -89,12 +90,7 @@ export default function Onboarding() {
       </div>
 
       <ModuleCard
-        icon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 11l3 3L22 4" />
-            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-          </svg>
-        }
+        icon={<ClipboardCheck size={24} />}
         title="Onboarding Module"
         description="Create a guided onboarding workflow in a private thread for new members."
         enabled={config?.enabled || false}

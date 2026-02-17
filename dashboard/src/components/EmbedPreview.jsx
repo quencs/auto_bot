@@ -1,3 +1,5 @@
+import { Bot, Check } from 'lucide-react';
+
 function intToHex(color) {
   if (color == null) return '#5865F2';
   return '#' + color.toString(16).padStart(6, '0');
@@ -6,9 +8,7 @@ function intToHex(color) {
 function BotAvatar() {
   return (
     <div className="dp-avatar">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="#fff">
-        <path d="M12 2a4 4 0 0 0-4 4v1H6.5A2.5 2.5 0 0 0 4 9.5v8A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5v-8A2.5 2.5 0 0 0 17.5 7H16V6a4 4 0 0 0-4-4zm-2 4a2 2 0 1 1 4 0v1h-4V6zm-1 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm6 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z" />
-      </svg>
+      <Bot size={18} color="#fff" />
     </div>
   );
 }
@@ -16,9 +16,7 @@ function BotAvatar() {
 function BotBadge() {
   return (
     <span className="dp-bot-badge">
-      <svg viewBox="0 0 16 16" width="10" height="10" fill="#fff">
-        <path d="M5.9 12.6L2 8.7l1.4-1.4 2.5 2.5 5.7-5.7L13 5.5l-7.1 7.1z" />
-      </svg>
+      <Check size={10} color="#fff" />
       BOT
     </span>
   );

@@ -1,3 +1,4 @@
+import { Plus, Clock, SquareX } from 'lucide-react';
 import BlockCard from './BlockCard.jsx';
 
 function generateId() {
@@ -59,15 +60,15 @@ export default function BlockList({ blocks, roles, emojis, onChange }) {
 
       <div className="ob-add-row">
         <button className="btn btn-ghost" onClick={() => addBlock('message')} disabled={blocks.length >= 20}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <Plus size={16} color="var(--primary)" />
           Message
         </button>
         <button className="btn btn-ghost" onClick={() => addBlock('delay')} disabled={blocks.length >= 20}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <Clock size={16} color="var(--warning)" />
           Delay
         </button>
         <button className="btn btn-ghost" onClick={() => addBlock('action')} disabled={blocks.length >= 20}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+          <SquareX size={16} color="var(--success)" />
           Dropdown
         </button>
       </div>

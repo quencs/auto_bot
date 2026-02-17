@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { UserRound } from 'lucide-react';
 import { api } from '../api/client.js';
 import ModuleCard from '../components/ModuleCard.jsx';
 import ChannelSelect from '../components/ChannelSelect.jsx';
@@ -68,12 +69,7 @@ export default function Welcome() {
       </div>
 
       <ModuleCard
-        icon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-        }
+        icon={<UserRound size={24} />}
         title="Welcome Module"
         description="Enable or disable welcome messages for this server."
         enabled={config?.enabled || false}

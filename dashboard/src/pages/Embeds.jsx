@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { LayoutGrid, Trash2 } from 'lucide-react';
 import { api } from '../api/client.js';
 import EmbedEditor from '../components/EmbedEditor.jsx';
 import EmbedPreview from '../components/EmbedPreview.jsx';
@@ -181,11 +182,7 @@ export default function Embeds() {
 
       {embeds.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 48 }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 48, height: 48, color: 'var(--text-muted)', margin: '0 auto 16px' }}>
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <line x1="3" y1="9" x2="21" y2="9" />
-            <line x1="9" y1="21" x2="9" y2="9" />
-          </svg>
+          <LayoutGrid size={48} strokeWidth={1.5} style={{ color: 'var(--text-muted)', margin: '0 auto 16px' }} />
           <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>No embeds yet</p>
           <button className="btn btn-primary" onClick={openNew}>Create your first embed</button>
         </div>
@@ -210,7 +207,7 @@ export default function Embeds() {
               <div className="embed-card-actions">
                 <button className="btn btn-ghost btn-sm" onClick={() => openEdit(embed)}>Edit</button>
                 <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(embed)}>
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--danger)" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
+                  <Trash2 size={14} color="var(--danger)" />
                 </button>
               </div>
             </div>

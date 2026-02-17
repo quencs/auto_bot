@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { Send, UserRound, Image, ChevronUp, ChevronDown, X } from 'lucide-react';
 import ChannelSelect from './ChannelSelect.jsx';
 
 const COLOR_PRESETS = [
@@ -35,10 +36,7 @@ function AvatarPlaceholder({ src, size = 32 }) {
   }
   return (
     <div className="ve-avatar-placeholder" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width={size * 0.5} height={size * 0.5}>
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-        <circle cx="12" cy="7" r="4" />
-      </svg>
+      <UserRound size={size * 0.5} strokeWidth={1.5} />
     </div>
   );
 }
@@ -54,11 +52,7 @@ function ImagePlaceholder({ src, onUrlChange, className }) {
   }
   return (
     <div className={`ve-img-drop ${className || ''}`}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="24" height="24">
-        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <polyline points="21 15 16 10 5 21" />
-      </svg>
+      <Image size={24} strokeWidth={1.5} />
       <input
         type="text"
         className="ve-img-url-input"
@@ -140,7 +134,7 @@ export default function EmbedEditor({
             disabled={sending || isNew}
             title={isNew ? "Sauvegardez d'abord" : ''}
           >
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+            <Send size={16} />
             {sending ? 'Envoi...' : 'Envoyer'}
           </button>
         </div>
@@ -241,13 +235,13 @@ export default function EmbedEditor({
                   <span className="ve-field-badge">Champ {i + 1}</span>
                   <div className="ve-field-controls">
                     <button onClick={() => moveField(i, -1)} disabled={i === 0} title="Monter">
-                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15" /></svg>
+                      <ChevronUp size={12} />
                     </button>
                     <button onClick={() => moveField(i, 1)} disabled={i === (data.fields || []).length - 1} title="Descendre">
-                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+                      <ChevronDown size={12} />
                     </button>
                     <button onClick={() => removeField(i)} title="Supprimer" className="ve-field-remove">
-                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      <X size={12} />
                     </button>
                   </div>
                 </div>

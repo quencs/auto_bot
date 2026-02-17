@@ -1,7 +1,7 @@
 import { NavLink, useParams, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { api } from '../api/client.js';
-import { Ticket, SquareCheckBig, LayoutDashboard, User, Logs, PanelsTopLeft, ArrowLeft} from 'lucide-react';
+import { Ticket, LayoutDashboard, User, Logs, PanelsTopLeft, ArrowLeft, ClipboardCheck } from 'lucide-react';
 
 function guildIconUrl(guild) {
   if (!guild.icon) return null;
@@ -63,7 +63,7 @@ export default function Sidebar() {
         <NavLink
           to={`/${guildId}/onboarding`}
           className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <SquareCheckBig/>
+          <ClipboardCheck/>
           Onboarding
         </NavLink>
         <NavLink
