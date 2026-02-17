@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import data from '@emoji-mart/data';
 import './EmojiPicker.css';
 import { SmilePlus } from 'lucide-react';
+
+let emojiDataCache = null;
 
 // Category icons mapping
 const CATEGORY_ICONS = {
@@ -35,7 +36,18 @@ export default function EmojiPicker({ value, onChange, customEmojis = [] }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('people');
   const [searchQuery, setSearchQuery] = useState('');
+  const [data, setData] = useState(emojiDataCache);
   const pickerRef = useRef(null);
+
+  // Lazy load emoji data when picker opens
+  useEffect(() => {
+    if (isOpen && !data) {
+      import('@emoji-mart/data').then((m) => {
+        emojiDataCache = m.default;
+        setData(m.default);
+      });
+    }
+  }, [isOpen, data]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -85,7 +97,9 @@ export default function EmojiPicker({ value, onChange, customEmojis = [] }) {
   let filteredEmojis = [];
   let filteredCustomEmojis = customEmojis;
 
-  if (query) {
+  if (!data) {
+    // Data not loaded yet
+  } else if (query) {
     // Search in unicode emojis
     Object.entries(data.emojis).forEach(([id, emoji]) => {
       const keywords = emoji.keywords || [];
@@ -121,7 +135,9 @@ export default function EmojiPicker({ value, onChange, customEmojis = [] }) {
   }
 
   const showCustom = customEmojis.length > 0 && (!query || filteredCustomEmojis.length > 0);
-  const categories = customEmojis.length > 0 ? ['custom', ...data.categories.map((c) => c.id)] : data.categories.map((c) => c.id);
+  const categories = data
+    ? (customEmojis.length > 0 ? ['custom', ...data.categories.map((c) => c.id)] : data.categories.map((c) => c.id))
+    : [];
 
   return (
     <div className="emoji-picker-container" ref={pickerRef}>
@@ -148,7 +164,13 @@ export default function EmojiPicker({ value, onChange, customEmojis = [] }) {
             />
           </div>
 
-          {!query && (
+          {!data && (
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+              Loading emojis...
+            </div>
+          )}
+
+          {data && !query && (
             <div className="emoji-picker-categories">
               {showCustom && (
                 <button
@@ -172,7 +194,7 @@ export default function EmojiPicker({ value, onChange, customEmojis = [] }) {
             </div>
           )}
 
-          <div className="emoji-picker-grid">
+          {data && <div className="emoji-picker-grid">
             {query && showCustom && filteredCustomEmojis.length > 0 && (
               <>
                 {filteredCustomEmojis.map((emoji) => (
@@ -224,7 +246,7 @@ export default function EmojiPicker({ value, onChange, customEmojis = [] }) {
                 No emoji found
               </div>
             )}
-          </div>
+          </div>}
 
           {displayEmoji && (
             <div className="emoji-picker-footer">

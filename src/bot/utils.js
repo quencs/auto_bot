@@ -17,9 +17,9 @@ export async function DiscordRequest(endpoint, options) {
     ...options
   });
   if (!res.ok) {
-    const data = await res.json();
-    console.log(res.status);
-    throw new Error(JSON.stringify(data));
+    const data = await res.json().catch(() => ({}));
+    console.error(`Discord API error ${res.status}: ${data.message || 'Unknown error'}`);
+    throw new Error(`Discord API error (${res.status})`);
   }
   return res;
 }
@@ -78,6 +78,23 @@ export async function removeMemberRole(guildId, userId, roleId) {
 }
 
 /**
+ * Validate that a URL is safe to call (no private/local addresses)
+ */
+function isUrlSafe(urlString) {
+  try {
+    const parsed = new URL(urlString);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0'
+      || hostname === '[::1]' || hostname.startsWith('10.') || hostname.startsWith('192.168.')
+      || hostname.startsWith('172.')) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Call a generic webhook URL with a JSON payload
  * @param {string} url - Webhook URL to POST to
  * @param {object} payload - JSON payload to send
@@ -88,19 +105,28 @@ export async function callWebhook(url, payload) {
     console.error('callWebhook: no URL provided');
     return null;
   }
+  if (!isUrlSafe(url)) {
+    console.error('callWebhook: URL blocked (private/local address)');
+    return null;
+  }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     if (!res.ok) {
-      console.error(`Webhook error (${res.status}): ${url}`);
+      console.error(`Webhook error (${res.status})`);
       return null;
     }
     return res.json().catch(() => ({ success: true }));
   } catch (err) {
-    console.error('Webhook call failed:', err.message);
+    clearTimeout(timeoutId);
+    console.error('Webhook call failed:', err.name === 'AbortError' ? 'Request timed out' : err.message);
     return null;
   }
 }

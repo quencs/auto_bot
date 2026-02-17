@@ -12,10 +12,16 @@ export default function ServerList() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     api.getGuilds()
-      .then(setGuilds)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (!cancelled) setGuilds(data);
+      })
+      .catch((err) => console.error('Failed to fetch guilds:', err))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   if (loading) {
@@ -57,7 +63,7 @@ export default function ServerList() {
                 {guildIconUrl(guild) ? (
                   <img src={guildIconUrl(guild)} alt="" />
                 ) : (
-                  guild.name[0]
+                  guild.name?.[0] || '?'
                 )}
               </div>
               <div className="server-card-name">{guild.name}</div>

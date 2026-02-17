@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import Session from '../models/Session.js';
 
@@ -16,11 +17,21 @@ function getRedirectUri() {
  * GET /api/auth/login - Redirect to Discord OAuth2
  */
 router.get('/login', (req, res) => {
+  const state = crypto.randomBytes(16).toString('hex');
+  res.cookie('oauth_state', state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production' || process.env.DASHBOARD_URL?.startsWith('https'),
+    sameSite: 'lax',
+    maxAge: 5 * 60 * 1000, // 5 minutes
+    path: '/',
+  });
+
   const params = new URLSearchParams({
     client_id: process.env.APP_ID,
     redirect_uri: getRedirectUri(),
     response_type: 'code',
     scope: SCOPES,
+    state,
   });
   res.redirect(`https://discord.com/oauth2/authorize?${params}`);
 });
@@ -29,9 +40,18 @@ router.get('/login', (req, res) => {
  * GET /api/auth/callback - OAuth2 callback
  */
 router.get('/callback', async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
+  const storedState = req.cookies?.oauth_state;
+
+  // Clear the state cookie
+  res.clearCookie('oauth_state', { path: '/' });
+
   if (!code) {
     return res.status(400).json({ error: 'Missing code parameter' });
+  }
+
+  if (!state || !storedState || state !== storedState) {
+    return res.status(403).json({ error: 'Invalid OAuth state' });
   }
 
   try {
@@ -90,10 +110,11 @@ router.get('/callback', async (req, res) => {
     );
 
     // Set session cookie
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.DASHBOARD_URL?.startsWith('https');
     res.cookie('session', sessionId, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' || process.env.DASHBOARD_URL?.startsWith('https'),
-      sameSite: 'lax',
+      secure: isProduction,
+      sameSite: 'strict',
       maxAge: SESSION_DURATION,
       path: '/',
     });

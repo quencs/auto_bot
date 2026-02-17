@@ -1,6 +1,27 @@
 const BASE = '/api';
 
+// Deduplicate concurrent GET requests to the same endpoint
+const pendingGets = new Map();
+
 async function request(path, options = {}) {
+  const method = options.method || 'GET';
+
+  // Deduplicate GET requests
+  if (method === 'GET') {
+    const existing = pendingGets.get(path);
+    if (existing) return existing;
+
+    const promise = doRequest(path, options).finally(() => {
+      pendingGets.delete(path);
+    });
+    pendingGets.set(path, promise);
+    return promise;
+  }
+
+  return doRequest(path, options);
+}
+
+async function doRequest(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
     credentials: 'include',
     headers: {

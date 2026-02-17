@@ -9,12 +9,16 @@ export default function Login() {
   const error = searchParams.get('error');
 
   useEffect(() => {
+    let cancelled = false;
     api.getMe()
       .then((user) => {
-        if (user) navigate('/servers', { replace: true });
+        if (!cancelled && user) navigate('/servers', { replace: true });
       })
       .catch(() => {})
-      .finally(() => setChecking(false));
+      .finally(() => {
+        if (!cancelled) setChecking(false);
+      });
+    return () => { cancelled = true; };
   }, [navigate]);
 
   if (checking) {

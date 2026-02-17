@@ -124,11 +124,20 @@ router.get('/:id/config', requireGuildAdmin, async (req, res) => {
 /**
  * PATCH /api/guilds/:id/config - Update guild config
  */
+const ALLOWED_CONFIG_FIELDS = ['prefix', 'language', 'timezone'];
+
 router.patch('/:id/config', requireGuildAdmin, async (req, res) => {
   try {
+    const update = { updatedBy: req.session.userId, guildName: req.guild.name };
+    for (const [key, value] of Object.entries(req.body)) {
+      if (ALLOWED_CONFIG_FIELDS.includes(key)) {
+        update[key] = value;
+      }
+    }
+
     const config = await GuildConfig.findOneAndUpdate(
       { guildId: req.params.id },
-      { ...req.body, updatedBy: req.session.userId, guildName: req.guild.name },
+      update,
       { new: true, upsert: true, runValidators: true }
     );
     res.json(config);
@@ -160,11 +169,15 @@ router.get('/:id/welcome', requireGuildAdmin, async (req, res) => {
 /**
  * PATCH /api/guilds/:id/welcome - Update welcome config
  */
+const ALLOWED_WELCOME_FIELDS = ['enabled', 'channelId', 'message', 'embed', 'dmEnabled', 'dmMessage'];
+
 router.patch('/:id/welcome', requireGuildAdmin, async (req, res) => {
   try {
     const update = {};
     for (const [key, value] of Object.entries(req.body)) {
-      update[`welcome.${key}`] = value;
+      if (ALLOWED_WELCOME_FIELDS.includes(key)) {
+        update[`welcome.${key}`] = value;
+      }
     }
     update.updatedBy = req.session.userId;
 
@@ -202,15 +215,24 @@ router.get('/:id/logs', requireGuildAdmin, async (req, res) => {
 /**
  * PATCH /api/guilds/:id/logs - Update logs config
  */
+const ALLOWED_LOGS_FIELDS = ['enabled', 'channelId'];
+const ALLOWED_LOG_EVENTS = [
+  'memberJoin', 'memberLeave', 'memberBan', 'memberUnban',
+  'messageEdit', 'messageDelete', 'roleCreate', 'roleDelete',
+  'channelCreate', 'channelDelete',
+];
+
 router.patch('/:id/logs', requireGuildAdmin, async (req, res) => {
   try {
     const update = {};
     for (const [key, value] of Object.entries(req.body)) {
       if (key === 'events' && typeof value === 'object') {
         for (const [event, enabled] of Object.entries(value)) {
-          update[`logs.events.${event}`] = enabled;
+          if (ALLOWED_LOG_EVENTS.includes(event) && typeof enabled === 'boolean') {
+            update[`logs.events.${event}`] = enabled;
+          }
         }
-      } else {
+      } else if (ALLOWED_LOGS_FIELDS.includes(key)) {
         update[`logs.${key}`] = value;
       }
     }
@@ -541,6 +563,21 @@ function validateTicketTypes(ticketTypes) {
       errors.push(`Ticket type ${i}: invalid action type "${tt.action.type}"`);
     } else if (tt.action.type === 'webhook' && !tt.action.webhookUrl) {
       errors.push(`Ticket type ${i}: webhook action requires webhookUrl`);
+    } else if (tt.action.type === 'webhook' && tt.action.webhookUrl) {
+      try {
+        const webhookUrl = new URL(tt.action.webhookUrl);
+        if (!['http:', 'https:'].includes(webhookUrl.protocol)) {
+          errors.push(`Ticket type ${i}: webhook URL must use http or https`);
+        }
+        const hostname = webhookUrl.hostname.toLowerCase();
+        if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0'
+          || hostname.startsWith('10.') || hostname.startsWith('192.168.')
+          || hostname.startsWith('172.') || hostname === '[::1]') {
+          errors.push(`Ticket type ${i}: webhook URL cannot target private/local addresses`);
+        }
+      } catch {
+        errors.push(`Ticket type ${i}: invalid webhook URL`);
+      }
     } else if (tt.action.type === 'private-thread' && !tt.action.threadChannelId) {
       errors.push(`Ticket type ${i}: private-thread action requires threadChannelId`);
     }
