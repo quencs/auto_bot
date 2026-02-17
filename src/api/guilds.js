@@ -9,6 +9,10 @@ import { executeOnboarding } from '../bot/onboarding.js';
 
 const router = Router();
 
+// In-memory cache for guild details (channels, roles, emojis) to avoid Discord rate limits
+const guildCache = new Map();
+const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
 /**
  * GET /api/guilds - List user's guilds (filtered: admin + bot present)
  */
@@ -48,10 +52,18 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', requireGuildAdmin, async (req, res) => {
   try {
+    const guildId = req.params.id;
+
+    // Return cached data if fresh
+    const cached = guildCache.get(guildId);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return res.json(cached.data);
+    }
+
     const [channelsRes, rolesRes, emojisRes] = await Promise.all([
-      DiscordRequest(`guilds/${req.params.id}/channels`, { method: 'GET' }),
-      DiscordRequest(`guilds/${req.params.id}/roles`, { method: 'GET' }),
-      DiscordRequest(`guilds/${req.params.id}/emojis`, { method: 'GET' }),
+      DiscordRequest(`guilds/${guildId}/channels`, { method: 'GET' }),
+      DiscordRequest(`guilds/${guildId}/roles`, { method: 'GET' }),
+      DiscordRequest(`guilds/${guildId}/emojis`, { method: 'GET' }),
     ]);
 
     const channels = await channelsRes.json();
@@ -65,7 +77,7 @@ router.get('/:id', requireGuildAdmin, async (req, res) => {
       .map((c) => ({ id: c.id, name: c.name, position: c.position }));
 
     const sortedRoles = roles
-      .filter((r) => r.id !== req.params.id) // Exclude @everyone
+      .filter((r) => r.id !== guildId) // Exclude @everyone
       .sort((a, b) => b.position - a.position)
       .map((r) => ({ id: r.id, name: r.name, color: r.color, position: r.position }));
 
@@ -73,14 +85,17 @@ router.get('/:id', requireGuildAdmin, async (req, res) => {
       .filter((e) => e.available !== false)
       .map((e) => ({ id: e.id, name: e.name, animated: e.animated || false }));
 
-    res.json({
+    const result = {
       id: req.guild.id,
       name: req.guild.name,
       icon: req.guild.icon,
       channels: textChannels,
       roles: sortedRoles,
       emojis: guildEmojis,
-    });
+    };
+
+    guildCache.set(guildId, { data: result, timestamp: Date.now() });
+    res.json(result);
   } catch (err) {
     console.error('Error fetching guild details:', err);
     res.status(500).json({ error: 'Failed to fetch guild details' });
