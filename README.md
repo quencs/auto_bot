@@ -1,6 +1,6 @@
 # Getting Started app for Discord
 
-This project contains a basic rock-paper-scissors-style Discord app written in JavaScript, built for the [getting started guide](https://discord.com/developers/docs/getting-started).
+This project contains a basic rock-paper-scissors-style Discord app written in JavaScript, built for the [getting started guide](https://docs.discord.com/developers/quick-start/getting-started).
 
 ![Demo of app](https://github.com/discord/discord-example-app/raw/main/assets/getting-started-demo.gif?raw=true)
 
@@ -31,7 +31,7 @@ Before you start, you'll need to install [NodeJS](https://nodejs.org/en/download
 - `bot` (with Send Messages enabled)
 
 
-Configuring the app is covered in detail in the [getting started guide](https://discord.com/developers/docs/getting-started).
+Configuring the app is covered in detail in the [getting started guide](https://docs.discord.com/developers/quick-start/getting-started).
 
 ### Setup project
 
@@ -49,7 +49,7 @@ npm install
 
 Fetch the credentials from your app's settings and add them to a `.env` file (see `.env.sample` for an example). You'll need your app ID (`APP_ID`), bot token (`DISCORD_TOKEN`), and public key (`PUBLIC_KEY`).
 
-Fetching credentials is covered in detail in the [getting started guide](https://discord.com/developers/docs/getting-started).
+Fetching credentials is covered in detail in the [getting started guide](https://docs.discord.com/developers/quick-start/getting-started).
 
 > 🔑 Environment variables can be added to the `.env` file in Glitch or when developing locally, and in the Secrets tab in Replit (the lock icon on the left).
 
@@ -71,7 +71,7 @@ node app.js
 
 > ⚙️ A package [like `nodemon`](https://github.com/remy/nodemon), which watches for local changes and restarts your app, may be helpful while locally developing.
 
-If you aren't following the [getting started guide](https://discord.com/developers/docs/getting-started), you can move the contents of `examples/app.js` (the finished `app.js` file) to the top-level `app.js`.
+If you aren't following the [getting started guide](https://docs.discord.com/developers/quick-start/getting-started), you can move the contents of `examples/app.js` (the finished `app.js` file) to the top-level `app.js`.
 
 ### Set up interactivity
 
@@ -102,7 +102,7 @@ On the **General Information** tab, there will be an **Interactions Endpoint URL
 Click **Save Changes**, and your app should be ready to run 🚀
 
 ## Other resources
-- Read **[the documentation](https://discord.com/developers/docs/intro)** for in-depth information about API features.
+- Read **[the documentation](https://docs.discord.com/developers/intro)** for in-depth information about API features.
 - Browse the `examples/` folder in this project for smaller, feature-specific code examples
 - Join the **[Discord Developers server](https://discord.gg/discord-developers)** to ask questions about the API, attend events hosted by the Discord API team, and interact with other devs.
 - Check out **[community resources](https://discord.com/developers/docs/topics/community-resources#community-resources)** for language-specific tools maintained by community members.
