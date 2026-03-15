@@ -101,6 +101,31 @@ On the **General Information** tab, there will be an **Interactions Endpoint URL
 
 Click **Save Changes**, and your app should be ready to run 🚀
 
+## Observer Ward mode
+
+This repo is now set up with an Observer Ward style Dota assistant bot flow that matches the existing command + app structure.
+
+### Included slash commands
+
+- `/observer` -> shows command overview and quick usage
+- `/ward hero:<hero> lane:<safe|mid|off> minute:<number>` -> returns lane-specific ward recommendations
+- `/counter hero:<hero>` -> returns quick matchup notes (threats + favorable targets)
+- `/draft ally:<hero> enemy:<hero>` -> returns a short draft read and vision plan
+
+### Register updated commands
+
+Whenever command payloads change, run:
+
+```
+npm run register
+```
+
+Then restart the app:
+
+```
+npm start
+```
+
 ## Other resources
 - Read **[the documentation](https://discord.com/developers/docs/intro)** for in-depth information about API features.
 - Browse the `examples/` folder in this project for smaller, feature-specific code examples

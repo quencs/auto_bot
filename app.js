@@ -1,23 +1,24 @@
 import 'dotenv/config';
 import express from 'express';
 import {
-  ButtonStyleTypes,
   InteractionResponseFlags,
   InteractionResponseType,
   InteractionType,
   MessageComponentTypes,
   verifyKeyMiddleware,
 } from 'discord-interactions';
-import { getRandomEmoji, DiscordRequest } from './utils.js';
-import { getShuffledOptions, getResult } from './game.js';
+import { getRandomEmoji } from './utils.js';
+import {
+  buildCounterAdvice,
+  buildDraftAdvice,
+  buildObserverIntro,
+  buildWardAdvice,
+} from './dota.js';
 
 // Create an express app
 const app = express();
 // Get port, or default to 3000
 const PORT = process.env.PORT || 3000;
-// To keep track of our active games
-const activeGames = {};
-
 /**
  * Interactions endpoint URL where Discord will send HTTP requests
  * Parse request body and verifies incoming requests using discord-interactions package
@@ -38,11 +39,12 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
    * See https://discord.com/developers/docs/interactions/application-commands#slash-commands
    */
   if (type === InteractionType.APPLICATION_COMMAND) {
-    const { name } = data;
+    const { name, options = [] } = data;
 
-    // "test" command
-    if (name === 'test') {
-      // Send a message into the channel where command was triggered from
+    const getOptionValue = (optionName) =>
+      options.find((option) => option.name === optionName)?.value;
+
+    if (name === 'observer') {
       return res.send({
         type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
@@ -50,10 +52,63 @@ app.post('/interactions', verifyKeyMiddleware(process.env.PUBLIC_KEY), async fun
           components: [
             {
               type: MessageComponentTypes.TEXT_DISPLAY,
-              // Fetches a random emoji to send from a helper function
-              content: `hello world ${getRandomEmoji()}`
-            }
-          ]
+              content: `${buildObserverIntro()} ${getRandomEmoji()}`,
+            },
+          ],
+        },
+      });
+    }
+
+    if (name === 'ward') {
+      const hero = getOptionValue('hero');
+      const lane = getOptionValue('lane') || 'mid';
+      const minute = getOptionValue('minute');
+
+      return res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          flags: InteractionResponseFlags.IS_COMPONENTS_V2,
+          components: [
+            {
+              type: MessageComponentTypes.TEXT_DISPLAY,
+              content: buildWardAdvice(hero, lane, minute),
+            },
+          ],
+        },
+      });
+    }
+
+    if (name === 'counter') {
+      const hero = getOptionValue('hero');
+
+      return res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          flags: InteractionResponseFlags.IS_COMPONENTS_V2,
+          components: [
+            {
+              type: MessageComponentTypes.TEXT_DISPLAY,
+              content: buildCounterAdvice(hero),
+            },
+          ],
+        },
+      });
+    }
+
+    if (name === 'draft') {
+      const ally = getOptionValue('ally');
+      const enemy = getOptionValue('enemy');
+
+      return res.send({
+        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        data: {
+          flags: InteractionResponseFlags.IS_COMPONENTS_V2,
+          components: [
+            {
+              type: MessageComponentTypes.TEXT_DISPLAY,
+              content: buildDraftAdvice(ally, enemy),
+            },
+          ],
         },
       });
     }
